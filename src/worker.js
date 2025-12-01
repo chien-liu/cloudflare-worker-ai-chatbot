@@ -19,6 +19,17 @@ function getCorsHeaders(requestOrigin) {
 export default {
   async fetch(request, env) {
     const requestOrigin = request.headers.get('Origin');
+
+    // Block requests from disallowed origins or without Origin header
+    if (!requestOrigin || !ALLOWED_ORIGIN.includes(requestOrigin)) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+    }
+
     const CORS_HEADERS = getCorsHeaders(requestOrigin);
 
     // 1. Handle CORS preflight requests
@@ -54,7 +65,7 @@ export default {
       
     } catch (e) {
       // 4. Error Handling (Crucial for CORS)
-      const errorResponse = { error: 'Failed to process request.', details: e.message };
+      const errorResponse = { error: 'Failed to process request.' };
       return new Response(JSON.stringify(errorResponse), {
         status: 500,
         headers: {
