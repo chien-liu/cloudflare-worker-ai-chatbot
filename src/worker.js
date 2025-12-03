@@ -57,7 +57,7 @@ export default {
 
 			// 3. Log request details for monitoring
 			console.log('Request processed:', {
-				url: request.url,
+				request_origin: requestOrigin,
 				user_ip: request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For'),
 				user_input,
 				response,
