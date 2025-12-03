@@ -17,7 +17,8 @@ function getCorsHeaders(requestOrigin) {
 }
 
 export default {
-	async fetch(request, env) {
+	async fetch(request, env, ctx) {
+		const startTime = Date.now(); // Track request start time
 		const requestOrigin = request.headers.get('Origin');
 
 		// Reject requests from unauthorized origins
@@ -55,15 +56,22 @@ export default {
 				}
 			);
 
-			// 3. Log request details for monitoring
-			console.log('Request processed:', {
-				request_origin: requestOrigin,
-				user_ip: request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For'),
-				user_input,
-				response,
-			});
+			const responseTime = Date.now() - startTime; // Calculate response time
 
-			// 4. Successful Response
+			// Log asynchronously without blocking response
+			ctx.waitUntil(
+				Promise.resolve().then(() => {
+					console.log('Request processed:', {
+						request_origin: requestOrigin,
+						user_ip: request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For'),
+						user_input,
+						response,
+						response_time_ms: responseTime, // Add response time in milliseconds
+					});
+				})
+			);
+
+			// 3. Successful Response
 			return new Response(JSON.stringify(response), {
 				headers: {
 					'Content-Type': 'application/json',
@@ -71,11 +79,16 @@ export default {
 				},
 			});
 		} catch (e) {
+			// Log errors asynchronously
+			ctx.waitUntil(
+				Promise.resolve().then(() => {
+					console.error('Error processing request:', {
+						error: e.message,
+						stack: e.stack,
+					});
+				})
+			);
 			// 4. Error Handling (Crucial for CORS)
-			console.error('Error processing request:', {
-				error: e.message,
-				stack: e.stack,
-			});
 			const errorResponse = { error: 'Failed to process request.' };
 			return new Response(JSON.stringify(errorResponse), {
 				status: 500,
