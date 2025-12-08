@@ -63,7 +63,6 @@ export default {
 				Promise.resolve().then(() => {
 					console.log('Request processed:', {
 						request_origin: requestOrigin,
-						user_ip: request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For'),
 						user_input,
 						response,
 						response_time_ms: responseTime, // Add response time in milliseconds
