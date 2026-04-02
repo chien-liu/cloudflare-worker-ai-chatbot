@@ -45,7 +45,7 @@ export default {
 			// 2. Process AI request
 			const { prompt, user_input } = await request.json();
 			const response = await env.AI.run(
-				'@cf/meta/llama-3-8b-instruct',
+				'@cf/meta/llama-3.1-8b-instruct-fast',
 				{
 					prompt: prompt,
 				},
