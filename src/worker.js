@@ -1,8 +1,10 @@
+import { Hono } from 'hono';
+
 // Allowed origins for CORS requests
 const ALLOWED_ORIGIN = [
+	'https://chienliu.com',  // Production
 	'http://localhost:3000', // Local development
 	'http://localhost:8787', // Local development (Wrangler)
-	'https://chienliu.com', // Production
 ];
 
 // Returns CORS headers with the appropriate origin
@@ -16,86 +18,101 @@ function getCorsHeaders(requestOrigin) {
 	};
 }
 
-export default {
-	async fetch(request, env, ctx) {
-		const startTime = Date.now(); // Track request start time
-		const requestOrigin = request.headers.get('Origin');
+const app = new Hono();
 
-		// Reject requests from unauthorized origins
-		if (!requestOrigin || !ALLOWED_ORIGIN.includes(requestOrigin)) {
-			return new Response(JSON.stringify({ error: 'Forbidden' }), {
-				status: 403,
-				headers: {
-					'Content-Type': 'application/json',
+// Return 403 Forbidden if the request origin is not allowed
+function getRequestOriginResponse(requestOrigin) {
+	if (!requestOrigin || !ALLOWED_ORIGIN.includes(requestOrigin)) {
+		return new Response(JSON.stringify({ error: 'Forbidden' }), {
+			status: 403,
+			headers: {
+				'Content-Type': 'application/json',
+			},
+		});
+	}
+
+	return null;
+}
+
+app.options('/', (c) => {
+	const requestOrigin = c.req.header('Origin');
+	const forbiddenResponse = getRequestOriginResponse(requestOrigin);
+
+	if (forbiddenResponse) {
+		return forbiddenResponse;
+	}
+
+	const corsHeaders = getCorsHeaders(requestOrigin);
+	return new Response(null, {
+		status: 204,
+		headers: corsHeaders,
+	});
+});
+
+app.post('/', async (c) => {
+	const startTime = Date.now();
+	const requestOrigin = c.req.header('Origin');
+	const forbiddenResponse = getRequestOriginResponse(requestOrigin);
+
+	if (forbiddenResponse) {
+		return forbiddenResponse;
+	}
+
+	const corsHeaders = getCorsHeaders(requestOrigin);
+
+	try {
+		const { prompt, user_input } = await c.req.json();
+		const response = await c.env.AI.run(
+			'@cf/meta/llama-3.1-8b-instruct-fast',
+			{
+				prompt,
+			},
+			{
+				gateway: {
+					id: 'react-chatbot-gateway',
 				},
-			});
-		}
+			}
+		);
 
-		const CORS_HEADERS = getCorsHeaders(requestOrigin);
+		const responseTime = Date.now() - startTime;
 
-		// 1. Handle CORS preflight requests
-		if (request.method === 'OPTIONS') {
-			return new Response(null, {
-				status: 204, // Correct status for preflight
-				headers: CORS_HEADERS,
-			});
-		}
+		c.executionCtx.waitUntil(
+			Promise.resolve().then(() => {
+				console.log('Request processed:', {
+					request_origin: requestOrigin,
+					user_input,
+					response,
+					response_time_ms: responseTime,
+				});
+			})
+		);
 
-		try {
-			// 2. Process AI request
-			const { prompt, user_input } = await request.json();
-			const response = await env.AI.run(
-				'@cf/meta/llama-3.1-8b-instruct-fast',
-				{
-					prompt: prompt,
-				},
-				{
-					gateway: {
-						id: 'react-chatbot-gateway',
-					},
-				}
-			);
+		return new Response(JSON.stringify(response), {
+			headers: {
+				'Content-Type': 'application/json',
+				...corsHeaders,
+			},
+		});
+	} catch (e) {
+		const error = e instanceof Error ? e : new Error(String(e));
 
-			const responseTime = Date.now() - startTime; // Calculate response time
+		c.executionCtx.waitUntil(
+			Promise.resolve().then(() => {
+				console.error('Error processing request:', {
+					error: error.message,
+					stack: error.stack,
+				});
+			})
+		);
 
-			// Log asynchronously without blocking response
-			ctx.waitUntil(
-				Promise.resolve().then(() => {
-					console.log('Request processed:', {
-						request_origin: requestOrigin,
-						user_input,
-						response,
-						response_time_ms: responseTime, // Add response time in milliseconds
-					});
-				})
-			);
+		return new Response(JSON.stringify({ error: 'Failed to process request.' }), {
+			status: 500,
+			headers: {
+				'Content-Type': 'application/json',
+				...corsHeaders,
+			},
+		});
+	}
+});
 
-			// 3. Successful Response
-			return new Response(JSON.stringify(response), {
-				headers: {
-					'Content-Type': 'application/json',
-					...CORS_HEADERS, // Include all CORS headers on success
-				},
-			});
-		} catch (e) {
-			// Log errors asynchronously
-			ctx.waitUntil(
-				Promise.resolve().then(() => {
-					console.error('Error processing request:', {
-						error: e.message,
-						stack: e.stack,
-					});
-				})
-			);
-			// 4. Error Handling (Crucial for CORS)
-			const errorResponse = { error: 'Failed to process request.' };
-			return new Response(JSON.stringify(errorResponse), {
-				status: 500,
-				headers: {
-					'Content-Type': 'application/json',
-					...CORS_HEADERS, // Include CORS headers on error
-				},
-			});
-		}
-	},
-};
+export default app;
