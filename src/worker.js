@@ -63,27 +63,26 @@ function isAuthorizedRequest(c) {
 	return timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
-function generateSystemPrompt() {
+function generateSystemPrompt(notes) {
+	const ragSections = [2, 1, 0].map((index) => {
+		const note = notes[index]?.trim() || 'No retrieved note.';
+		return `### TOP${index + 1}\n${note}`;
+	});
+
 	const sections = [
 		'You are a personal assistant for Chien (a.k.a. Chien Liu).',
 		'',
-		'## Rules',
-		"- **Primary Focus:** Answer questions about Chien using only the context provided.",
-		'- If information about Chien isn\'t in the context, say: "That detail isn\'t in Chien\'s profile."',
-		'- Use third-person perspective when discussing Chien (e.g., "Chien worked at...").',
-		'- For general questions unrelated to Chien, provide helpful answers.',
-		'- Keep responses completed and under 100 words.',
+		'## Verified Context',
+		...ragSections,
 		'',
+		'## Strict Instructions',
+		'- ONLY use the "Verified Context" above to answer questions about Chien.',
+		'- If the info is missing from the context, say: "That detail isn\'t in Chien\'s profile."',
+		'- Use third-person (e.g., "Chien is...").',
+		'- Keep responses under 100 words.',
 		'## Response Format',
-		'- **Questions about Chien**: Brief summary + bulleted highlights.',
-		'- **General questions**: Provide concise, helpful answers.',
-		'- **Highlight**: Highlight key details and impact if applicable.',
-		'',
-		'## Safety and Refusal Policy',
-		'- Do not generate content that violates safety guidelines (e.g., illegal activities, harmful content, hate speech).',
-		'- For sensitive topics, politely decline and redirect to professional topics.',
-		'',
-		'Be professional, concise, and confident.',
+		'- Questions about Chien: Brief summary + bulleted highlights.',
+		'Be professional and confident.',
 	];
 
 	return sections.join('\n');
@@ -132,18 +131,17 @@ app.post('/chatbot', async (c) => {
 		if (vecIds.length > 0) {
 			const placeholders = vecIds.map(() => '?').join(', ');
 			const { results } = await c.env.DB.prepare(`SELECT * FROM notes WHERE id IN (${placeholders})`).bind(...vecIds).run();
-			notes = results.map((r) => r.text);
+			const notesById = new Map(results.map((r) => [String(r.id), r.text]));
+			notes = vecIds.map((id) => notesById.get(String(id))).filter((note) => typeof note === 'string' && note.trim());
 		}
 
-		const ragContext = notes.join('\n\n');
-		const systemPrompt = generateSystemPrompt();
+		const systemPrompt = generateSystemPrompt(notes);
 
 		const response = await c.env.AI.run(
 			'@cf/meta/llama-3.1-8b-instruct-fast',
 			{
 				messages: [
 					{ role: 'system', content: systemPrompt },
-					...(ragContext ? [{ role: 'system', content: `## Context\n${ragContext}` }] : []),
 					{ role: 'user', content: user_input },
 				],
 			},
@@ -160,6 +158,10 @@ app.post('/chatbot', async (c) => {
 			request_origin: requestOrigin,
 			user_input,
 			rag_notes_count: notes.length,
+			message: [
+				{ role: 'system', content: systemPrompt },
+				{ role: 'user', content: user_input },
+			],
 			response,
 			response_time_ms: responseTime,
 		});
