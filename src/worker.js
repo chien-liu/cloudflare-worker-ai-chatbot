@@ -75,7 +75,7 @@ function generateSystemPrompt() {
 		'## Response Format',
 		'- **Questions about Chien**: Brief summary + bulleted highlights.',
 		'- **General questions**: Provide concise, helpful answers.',
-		'- **Always highlight** key details and impact (e.g., **PyTorch**, **90% reduction**).',
+		'- **Highlight**: Highlight key details and impact if applicable.',
 		'',
 		'## Safety and Refusal Policy',
 		'- Do not generate content that violates safety guidelines (e.g., illegal activities, harmful content, hate speech).',
