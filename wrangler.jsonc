@@ -1,31 +1,57 @@
 {
-  "name": "worker-ai-chatbot",
-  "main": "src/worker.js",
-  "workers_dev": false,
-  "preview_urls": false,
-  "compatibility_date": "2025-11-30",
-  "routes": [
+	"name": "worker-ai-chatbot",
+	"main": "src/worker.js",
+	"workers_dev": false,
+	"preview_urls": false,
+	"compatibility_date": "2025-11-30",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"routes": [
+		{
+			"pattern": "api.chienliu.com/chatbot",
+			"zone_name": "chienliu.com"
+		}
+	],
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1,
+		"logs": {
+			"enabled": true,
+			"head_sampling_rate": 1,
+			"persist": true,
+			"invocation_logs": true
+		},
+		"traces": {
+			"enabled": false,
+			"persist": true,
+			"head_sampling_rate": 1
+		}
+	},
+	"ai": {
+		"binding": "AI",
+		"remote": true
+	},
+	"vectorize": [
+		{
+			"binding": "VECTORIZE_INDEX",
+			"index_name": "chien-ai-chatbot-rag",
+			"remote": true
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "chien-ai-chatbot-rag",
+			"database_id": "5320d07d-2352-4824-b0f9-801880fd9b71",
+			"remote": true
+		}
+	],
+    "workflows": [
     {
-      "pattern": "api.chienliu.com/chatbot",
-      "zone_name": "chienliu.com"
+      "name": "chien-ai-chatbot-rag",
+      "binding": "RAG_WORKFLOW",
+      "class_name": "RAGWorkflow"
     }
-  ],
-  "observability": {
-    "enabled": true,
-    "head_sampling_rate": 1,
-    "logs": {
-      "enabled": true,
-      "head_sampling_rate": 1,
-      "persist": true,
-      "invocation_logs": true
-    },
-    "traces": {
-      "enabled": false,
-      "persist": true,
-      "head_sampling_rate": 1
-    }
-  },
-  "ai": {
-    "binding": "AI"
-  }
+  ]
 }
