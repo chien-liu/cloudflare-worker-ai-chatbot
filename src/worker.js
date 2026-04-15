@@ -1,6 +1,6 @@
 /**
  * API routes:
- * - `/` allows browser CORS requests from the configured origins below.
+ * - `/chatbot` allows browser CORS requests from the configured origins below.
  * - `/notes` and `/notes/:id` do not allow CORS and are intended to be called
  *   from a local CLI or other non-browser client with `WRITE_API_TOKEN`.
  */
@@ -90,7 +90,7 @@ function generateSystemPrompt() {
 const app = new Hono();
 
 // Handle preflight CORS requests
-app.options('/', (c) => {
+app.options('/chatbot', (c) => {
 	const requestOrigin = c.req.header('Origin');
 	const forbiddenResponse = getRequestOriginResponse(requestOrigin);
 
@@ -105,7 +105,7 @@ app.options('/', (c) => {
 	});
 });
 
-app.post('/', async (c) => {
+app.post('/chatbot', async (c) => {
 	const startTime = Date.now();
 	const requestOrigin = c.req.header('Origin');
 	const forbiddenResponse = getRequestOriginResponse(requestOrigin);
