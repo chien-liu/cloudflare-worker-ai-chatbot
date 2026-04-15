@@ -1,6 +1,8 @@
 # RAG ntoes
 
 notes/
+.rag-sync-state
+.rag-sync-state.*
 
 # Logs
 

@@ -3,12 +3,11 @@ import { WorkflowEntrypoint } from 'cloudflare:workers';
 export class RAGWorkflow extends WorkflowEntrypoint {
 	async run(event, step) {
 		const env = this.env;
-		const { text } = event.payload;
+		const { id, text } = event.payload;
 
-		const record = await step.do(`create database record`, async () => {
-			const query = 'INSERT INTO notes (text) VALUES (?) RETURNING *';
-
-			const { results } = await env.DB.prepare(query).bind(text).run();
+		const record = await step.do(`upsert database record`, async () => {
+			const query = 'INSERT INTO notes (id, text) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET text = excluded.text RETURNING *';
+			const { results } = await env.DB.prepare(query).bind(id, text).run();
 
 			const record = results[0];
 			if (!record) throw new Error('Failed to create note');

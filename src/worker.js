@@ -1,7 +1,9 @@
 /**
  * API routes:
  * - `/chatbot` allows browser CORS requests from the configured origins below.
- * - `/notes` and `/notes/:id` do not allow CORS and are intended to be called
+ * - `PUT /notes/:id` upserts a note with a caller-provided ID and a JSON body.
+ * - `DELETE /notes/:id` removes a note from D1 and Vectorize.
+ * - `/notes/:id` does not allow CORS and is intended to be called
  *   from a local CLI or other non-browser client with `WRITE_API_TOKEN`.
  */
 
@@ -187,15 +189,29 @@ app.post('/chatbot', async (c) => {
 });
 
 // Insert notes into RAG workflow which will handle vectorization and storage
-app.post('/notes', async (c) => {
+app.put('/notes/:id', async (c) => {
 	if (!isAuthorizedRequest(c)) {
 		return c.text('Unauthorized', 401);
 	}
 
+	const noteId = c.req.param('id');
+	if (!noteId) {
+		return c.text('Missing note id', 400);
+	}
+
 	const { text } = await c.req.json();
-	if (!text) return c.text('Missing text', 400);
-	await c.env.RAG_WORKFLOW.create({ params: { text } });
-	return c.text('Created note', 201);
+	if (typeof text !== 'string' || !text.trim()) {
+		return c.text('Missing text', 400);
+	}
+
+	await c.env.RAG_WORKFLOW.create({
+		params: {
+			id: noteId,
+			text,
+		},
+	});
+
+	return c.text('Upserted note', 202);
 });
 
 // Endpoint to delete notes by ID
@@ -204,12 +220,15 @@ app.delete('/notes/:id', async (c) => {
 		return c.text('Unauthorized', 401);
 	}
 
-	const { id } = c.req.param();
+	const noteId = c.req.param('id');
+	if (!noteId) {
+		return c.text('Missing note id', 400);
+	}
 
 	const query = `DELETE FROM notes WHERE id = ?`;
-	await c.env.DB.prepare(query).bind(id).run();
+	await c.env.DB.prepare(query).bind(noteId).run();
 
-	await c.env.VECTORIZE_INDEX.deleteByIds([id]);
+	await c.env.VECTORIZE_INDEX.deleteByIds([noteId]);
 
 	return c.status(204);
 });
