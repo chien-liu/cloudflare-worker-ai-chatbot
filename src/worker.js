@@ -61,6 +61,32 @@ function isAuthorizedRequest(c) {
 	return timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
+function generateSystemPrompt() {
+	const sections = [
+		'You are a personal assistant for Chien (a.k.a. Chien Liu).',
+		'',
+		'## Rules',
+		"- **Primary Focus:** Answer questions about Chien using only the context provided.",
+		'- If information about Chien isn\'t in the context, say: "That detail isn\'t in Chien\'s profile."',
+		'- Use third-person perspective when discussing Chien (e.g., "Chien worked at...").',
+		'- For general questions unrelated to Chien, provide helpful answers.',
+		'- Keep responses completed and under 100 words.',
+		'',
+		'## Response Format',
+		'- **Questions about Chien**: Brief summary + bulleted highlights.',
+		'- **General questions**: Provide concise, helpful answers.',
+		'- **Always highlight** key details and impact (e.g., **PyTorch**, **90% reduction**).',
+		'',
+		'## Safety and Refusal Policy',
+		'- Do not generate content that violates safety guidelines (e.g., illegal activities, harmful content, hate speech).',
+		'- For sensitive topics, politely decline and redirect to professional topics.',
+		'',
+		'Be professional, concise, and confident.',
+	];
+
+	return sections.join('\n');
+}
+
 const app = new Hono();
 
 // Handle preflight CORS requests
@@ -91,11 +117,33 @@ app.post('/', async (c) => {
 	const corsHeaders = getCorsHeaders(requestOrigin);
 
 	try {
-		const { prompt, user_input } = await c.req.json();
+		const { user_input } = await c.req.json();
+
+		// Embed the user question to find relevant notes
+		const embeddings = await c.env.AI.run('@cf/baai/bge-base-en-v1.5', { text: user_input });
+		const vectors = embeddings.data[0];
+
+		const vectorQuery = await c.env.VECTORIZE_INDEX.query(vectors, { topK: 3 });
+		const vecIds = vectorQuery.matches?.map((m) => m.id) ?? [];
+
+		let notes = [];
+		if (vecIds.length > 0) {
+			const placeholders = vecIds.map(() => '?').join(', ');
+			const { results } = await c.env.DB.prepare(`SELECT * FROM notes WHERE id IN (${placeholders})`).bind(...vecIds).run();
+			notes = results.map((r) => r.text);
+		}
+
+		const ragContext = notes.join('\n\n');
+		const systemPrompt = generateSystemPrompt();
+
 		const response = await c.env.AI.run(
 			'@cf/meta/llama-3.1-8b-instruct-fast',
 			{
-				prompt,
+				messages: [
+					{ role: 'system', content: systemPrompt },
+					...(ragContext ? [{ role: 'system', content: `## Context\n${ragContext}` }] : []),
+					{ role: 'user', content: user_input },
+				],
 			},
 			{
 				gateway: {
@@ -109,6 +157,7 @@ app.post('/', async (c) => {
 		console.log('Request processed:', {
 			request_origin: requestOrigin,
 			user_input,
+			rag_notes_count: notes.length,
 			response,
 			response_time_ms: responseTime,
 		});

@@ -12,6 +12,7 @@ export class RAGWorkflow extends WorkflowEntrypoint {
 
 			const record = results[0];
 			if (!record) throw new Error('Failed to create note');
+			console.log('[rag-workflow] created database record:', record.id);
 			return record;
 		});
 
@@ -21,16 +22,19 @@ export class RAGWorkflow extends WorkflowEntrypoint {
 			});
 			const values = embeddings.data[0];
 			if (!values) throw new Error('Failed to generate vector embedding');
+			console.log('[rag-workflow] generated embedding for record:', record.id);
 			return values;
 		});
 
 		await step.do(`insert vector`, async () => {
-			return env.VECTORIZE_INDEX.upsert([
+			const result = await env.VECTORIZE_INDEX.upsert([
 				{
 					id: record.id.toString(),
 					values: embedding,
 				},
 			]);
+			console.log('[rag-workflow] inserted vector for record:', record.id);
+			return result;
 		});
 	}
 }
