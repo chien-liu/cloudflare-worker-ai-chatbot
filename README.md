@@ -2,6 +2,10 @@
 
 This project keeps RAG source notes in the local `notes/` directory and syncs them into the Worker-backed D1 + Vectorize store.
 
+## Architecture diagram
+
+![Architecture and workflow diagram](docs/architecture-workflow.svg)
+
 ## Cloudflare deployment
 
 - This repository is integrated with Cloudflare Workers.
