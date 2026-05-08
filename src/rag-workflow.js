@@ -1,5 +1,7 @@
 import { WorkflowEntrypoint } from 'cloudflare:workers';
 
+import { EMBEDDING_MODEL } from './config';
+
 export class RAGWorkflow extends WorkflowEntrypoint {
 	async run(event, step) {
 		const env = this.env;
@@ -16,7 +18,7 @@ export class RAGWorkflow extends WorkflowEntrypoint {
 		});
 
 		const embedding = await step.do(`generate embedding`, async () => {
-			const embeddings = await env.AI.run('@cf/baai/bge-base-en-v1.5', {
+			const embeddings = await env.AI.run(EMBEDDING_MODEL, {
 				text,
 			});
 			const values = embeddings.data[0];

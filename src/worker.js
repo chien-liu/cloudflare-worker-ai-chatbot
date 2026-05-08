@@ -11,6 +11,7 @@ import { Buffer } from 'node:buffer';
 import { timingSafeEqual } from 'node:crypto';
 import { Hono } from 'hono';
 
+import { CHAT_MODEL, EMBEDDING_MODEL } from './config';
 import { RAGWorkflow } from './rag-workflow';
 
 // Allowed origins for CORS requests
@@ -121,7 +122,7 @@ app.post('/chatbot', async (c) => {
 		const { user_input } = await c.req.json();
 
 		// Embed the user question to find relevant notes
-		const embeddings = await c.env.AI.run('@cf/baai/bge-base-en-v1.5', { text: user_input });
+		const embeddings = await c.env.AI.run(EMBEDDING_MODEL, { text: user_input });
 		const vectors = embeddings.data[0];
 
 		const vectorQuery = await c.env.VECTORIZE_INDEX.query(vectors, { topK: 3 });
@@ -138,7 +139,7 @@ app.post('/chatbot', async (c) => {
 		const systemPrompt = generateSystemPrompt(notes);
 
 		const response = await c.env.AI.run(
-			'@cf/meta/llama-3.1-8b-instruct-fast',
+			CHAT_MODEL,
 			{
 				messages: [
 					{ role: 'system', content: systemPrompt },
