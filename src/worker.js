@@ -1,8 +1,16 @@
 /**
  * API routes:
  * - `/chatbot` allows browser CORS requests from the configured origins below.
+ *   Response JSON format:
+ *   {
+ *     "response": "Generated answer text",
+ *     "response_time_ms": 123
+ *   }
+ *
  * - `PUT /notes/:id` upserts a note with a caller-provided ID and a JSON body.
+ *
  * - `DELETE /notes/:id` removes a note from D1 and Vectorize.
+ *
  * - `/notes/:id` does not allow CORS and is intended to be called
  *   from a local CLI or other non-browser client with `WRITE_API_TOKEN`.
  */
@@ -155,11 +163,12 @@ app.post('/chatbot', async (c) => {
 
 		const responseTime = Date.now() - startTime;
 
-		console.log('Request processed:', {
+		console.log({
+			message: 'Request processed by worker AI chatbot',
 			request_origin: requestOrigin,
 			user_input,
 			rag_notes_count: notes.length,
-			message: [
+			prompt_messages: [
 				{ role: 'system', content: systemPrompt },
 				{ role: 'user', content: user_input },
 			],
@@ -167,7 +176,12 @@ app.post('/chatbot', async (c) => {
 			response_time_ms: responseTime,
 		});
 
-		return new Response(JSON.stringify(response), {
+		const formattedResponse = JSON.stringify({
+			response: response.choices[0].message.content,
+			response_time_ms: responseTime,
+		});
+
+		return new Response(formattedResponse, {
 			headers: {
 				'Content-Type': 'application/json',
 				...corsHeaders,
