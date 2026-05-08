@@ -153,6 +153,9 @@ app.post('/chatbot', async (c) => {
 					{ role: 'system', content: systemPrompt },
 					{ role: 'user', content: user_input },
 				],
+				chat_template_kwargs: {
+					enable_thinking: false
+				}
 			},
 			{
 				gateway: {
