@@ -75,7 +75,7 @@ Because of this behavior:
 
 ## Troubleshooting
 
-- `Missing auth token`: export `WRITE_API_TOKEN` or `RAG_SYNC_AUTH_TOKEN`.
+- `Missing auth token`: export `WRITE_API_TOKEN`.
 - `Notes directory not found`: create `notes/` or set `RAG_SYNC_NOTES_DIR`.
 - `Invalid note filename`: rename the file to `${id}_name.md`.
 - `Duplicate note id`: ensure only one markdown file uses each numeric ID.

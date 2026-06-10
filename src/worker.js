@@ -40,18 +40,8 @@ function getCorsHeaders(requestOrigin) {
 	};
 }
 
-// Return 403 Forbidden if the request origin is not allowed
-function getRequestOriginResponse(requestOrigin) {
-	if (!requestOrigin || !ALLOWED_ORIGIN.includes(requestOrigin)) {
-		return new Response(JSON.stringify({ error: 'Forbidden' }), {
-			status: 403,
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-	}
-
-	return null;
+function validateRequestOrigin(requestOrigin) {
+	return requestOrigin && ALLOWED_ORIGIN.includes(requestOrigin);
 }
 
 function isAuthorizedRequest(c) {
@@ -72,8 +62,11 @@ function isAuthorizedRequest(c) {
 	return timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
-function generateSystemPrompt(notes) {
-	const ragSections = [2, 1, 0].map((index) => {
+function generateSystemPrompt(notes, topK) {
+	// Create an array [topK, topK-1, ..., 1] to label the notes in order of relevance
+	const topKArray = Array.from({ length: topK + 1 }, (_, i) => topK - i);
+
+	const ragSections = topKArray.map((index) => {
 		const note = notes[index]?.trim() || 'No retrieved note.';
 		return `### TOP${index + 1}\n${note}`;
 	});
@@ -102,29 +95,25 @@ const app = new Hono();
 // Handle preflight CORS requests
 app.options('/chatbot', (c) => {
 	const requestOrigin = c.req.header('Origin');
-	const forbiddenResponse = getRequestOriginResponse(requestOrigin);
+	const corsHeaders = getCorsHeaders(requestOrigin);
 
-	if (forbiddenResponse) {
-		return forbiddenResponse;
+	if (!validateRequestOrigin(requestOrigin)) {
+		return c.json({ error: 'Forbidden' }, 403, corsHeaders);
 	}
 
-	const corsHeaders = getCorsHeaders(requestOrigin);
-	return new Response(null, {
-		status: 204,
-		headers: corsHeaders,
-	});
+	return c.body(null, 204, corsHeaders);
 });
 
 app.post('/chatbot', async (c) => {
-	const startTime = Date.now();
 	const requestOrigin = c.req.header('Origin');
-	const forbiddenResponse = getRequestOriginResponse(requestOrigin);
+	const corsHeaders = getCorsHeaders(requestOrigin);
 
-	if (forbiddenResponse) {
-		return forbiddenResponse;
+	if (!validateRequestOrigin(requestOrigin)) {
+		return c.json({ error: 'Forbidden' }, 403, corsHeaders);
 	}
 
-	const corsHeaders = getCorsHeaders(requestOrigin);
+	const startTime = Date.now();
+	const topK = 3;
 
 	try {
 		const { user_input } = await c.req.json();
@@ -133,18 +122,20 @@ app.post('/chatbot', async (c) => {
 		const embeddings = await c.env.AI.run(EMBEDDING_MODEL, { text: user_input });
 		const vectors = embeddings.data[0];
 
-		const vectorQuery = await c.env.VECTORIZE_INDEX.query(vectors, { topK: 3 });
+		const vectorQuery = await c.env.VECTORIZE_INDEX.query(vectors, { topK });
 		const vecIds = vectorQuery.matches?.map((m) => m.id) ?? [];
 
 		let notes = [];
 		if (vecIds.length > 0) {
 			const placeholders = vecIds.map(() => '?').join(', ');
-			const { results } = await c.env.DB.prepare(`SELECT * FROM notes WHERE id IN (${placeholders})`).bind(...vecIds).run();
+			const { results } = await c.env.DB.prepare(`SELECT * FROM notes WHERE id IN (${placeholders})`)
+				.bind(...vecIds)
+				.run();
 			const notesById = new Map(results.map((r) => [String(r.id), r.text]));
 			notes = vecIds.map((id) => notesById.get(String(id))).filter((note) => typeof note === 'string' && note.trim());
 		}
 
-		const systemPrompt = generateSystemPrompt(notes);
+		const systemPrompt = generateSystemPrompt(notes, topK);
 
 		const response = await c.env.AI.run(
 			CHAT_MODEL,
@@ -176,17 +167,14 @@ app.post('/chatbot', async (c) => {
 			response_time_ms: responseTime,
 		});
 
-		const formattedResponse = JSON.stringify({
-			response: response.choices[0].message.content,
-			response_time_ms: responseTime,
-		});
-
-		return new Response(formattedResponse, {
-			headers: {
-				'Content-Type': 'application/json',
-				...corsHeaders,
+		return c.json(
+			{
+				response: response.choices[0].message.content,
+				response_time_ms: responseTime,
 			},
-		});
+			200,
+			corsHeaders,
+		);
 	} catch (e) {
 		const error = e instanceof Error ? e : new Error(String(e));
 
@@ -195,17 +183,14 @@ app.post('/chatbot', async (c) => {
 			stack: error.stack,
 		});
 
-		return new Response(JSON.stringify({ error: 'Failed to process request.' }), {
-			status: 500,
-			headers: {
-				'Content-Type': 'application/json',
-				...corsHeaders,
-			},
-		});
+		return c.json({ error: 'Failed to process request.' }, 500, corsHeaders);
 	}
 });
 
-// Insert notes into RAG workflow which will handle vectorization and storage
+// Insert notes into RAG workflow which will handle vectorization and storage.
+// WRITE_API_TOKEN is intentionally absent in prod, so this endpoint is dev-only.
+// The dev env points to the prod D1 and Vectorize instances, enabling note
+// management without exposing the token.
 app.put('/notes/:id', async (c) => {
 	if (!isAuthorizedRequest(c)) {
 		return c.text('Unauthorized', 401);
@@ -232,6 +217,9 @@ app.put('/notes/:id', async (c) => {
 });
 
 // Endpoint to delete notes by ID
+// WRITE_API_TOKEN is intentionally absent in prod, so this endpoint is dev-only.
+// The dev env points to the prod D1 and Vectorize instances, enabling note
+// management without exposing the token.
 app.delete('/notes/:id', async (c) => {
 	if (!isAuthorizedRequest(c)) {
 		return c.text('Unauthorized', 401);
@@ -247,7 +235,7 @@ app.delete('/notes/:id', async (c) => {
 
 	await c.env.VECTORIZE_INDEX.deleteByIds([noteId]);
 
-	return c.status(204);
+	return c.text(`Note id=${noteId} deleted`);
 });
 
 // The error message does not expose internal details, but the error is logged for debugging

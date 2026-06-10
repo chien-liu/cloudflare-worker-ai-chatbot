@@ -19,7 +19,7 @@ BASE_URL=${RAG_SYNC_BASE_URL:-http://127.0.0.1:8787}
 
 
 if [[ -z "$WRITE_API_TOKEN" ]]; then
-	echo 'Missing auth token: set WRITE_API_TOKEN or RAG_SYNC_AUTH_TOKEN before running the sync script.' >&2
+	echo 'Missing auth token: set WRITE_API_TOKEN before running the sync script.' >&2
 	exit 1
 fi
 
