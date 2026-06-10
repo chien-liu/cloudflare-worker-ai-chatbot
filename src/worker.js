@@ -46,10 +46,7 @@ function validateRequestOrigin(requestOrigin) {
 
 function isAuthorizedRequest(c) {
 	const expected = c.env.WRITE_API_TOKEN;
-	if (!expected) {
-		console.error('WRITE_API_TOKEN is not configured');
-		return false;
-	}
+	if (!expected) return false;
 
 	const authHeader = c.req.header('Authorization') || '';
 	if (!authHeader.startsWith('Bearer ')) return false;
@@ -112,6 +109,7 @@ app.post('/chatbot', async (c) => {
 		return c.json({ error: 'Forbidden' }, 403, corsHeaders);
 	}
 
+	const requestId = crypto.randomUUID();
 	const startTime = Date.now();
 	const topK = 3;
 
@@ -155,16 +153,13 @@ app.post('/chatbot', async (c) => {
 		const responseTime = Date.now() - startTime;
 
 		console.log({
-			message: 'Request processed by worker AI chatbot',
+			requestId,
+			message: 'chatbot request processed',
 			request_origin: requestOrigin,
-			user_input,
 			rag_notes_count: notes.length,
-			prompt_messages: [
-				{ role: 'system', content: systemPrompt },
-				{ role: 'user', content: user_input },
-			],
-			response,
 			response_time_ms: responseTime,
+			prompt_tokens: response.usage?.prompt_tokens,
+			completion_tokens: response.usage?.completion_tokens,
 		});
 
 		return c.json(
@@ -178,7 +173,10 @@ app.post('/chatbot', async (c) => {
 	} catch (e) {
 		const error = e instanceof Error ? e : new Error(String(e));
 
-		console.error('Error processing request:', {
+		console.error({
+			requestId,
+			message: 'chatbot request failed',
+			request_origin: requestOrigin,
 			error: error.message,
 			stack: error.stack,
 		});
@@ -238,8 +236,8 @@ app.delete('/notes/:id', async (c) => {
 	return c.text(`Note id=${noteId} deleted`);
 });
 
-// The error message does not expose internal details, but the error is logged for debugging
 app.onError((err, c) => {
+	console.error('[worker] unhandled error:', err);
 	return c.text('Internal Server Error', 500);
 });
 
