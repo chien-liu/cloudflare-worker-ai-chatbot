@@ -1,62 +1,51 @@
 /**
  * API routes:
  * - `/chatbot` allows browser CORS requests from the configured origins below.
+ *
+ *   Example request:
+ *   curl -X POST https://<worker-host>/chatbot \
+ *     -H "Content-Type: application/json" \
+ *     -H "Origin: <allowed-origin>" \
+ *     -d '{"user_input": "What does Chien do for work?"}'
  *   Response JSON format:
  *   {
  *     "response": "Generated answer text",
  *     "response_time_ms": 123
  *   }
  *
- * - `PUT /notes/:id` upserts a note with a caller-provided ID and a JSON body.
  *
- * - `DELETE /notes/:id` removes a note from D1 and Vectorize.
+ * - `PUT /notes/:id` (local only) upserts a note with a caller-provided ID and a JSON body.
  *
- * - `/notes/:id` does not allow CORS and is intended to be called
- *   from a local CLI or other non-browser client with `WRITE_API_TOKEN`.
+ *   Example request:
+ *   curl -X PUT http://localhost:8787/notes/<id> \
+ *     -H "Content-Type: application/json" \
+ *     -d '{"text": "Chien is a software engineer at Cloudflare."}'
+ *
+ *
+ * - `DELETE /notes/:id` (local only) removes a note from D1 and Vectorize.
+ *
+ *   Example request:
+ *   curl -X DELETE http://localhost:8787/notes/<id>
+ *
+ *
+ * - `/notes/:id` does not allow CORS and is intended to be called from a local CLI with `ADMIN_API_ENABLED`.
+ *   In prod, it is also unreachable — the Cloudflare route pattern (`api.chienliu.com/chatbot*`)
+ *   only forwards `/chatbot` requests to this Worker, so `/notes/:id` is blocked at the edge.
  */
-
-import { Buffer } from 'node:buffer';
-import { timingSafeEqual } from 'node:crypto';
 import { Hono } from 'hono';
 
 import { CHAT_MODEL, EMBEDDING_MODEL } from './config';
 import { RAGWorkflow } from './rag-workflow';
 
-// Allowed origins for CORS requests
-const ALLOWED_ORIGIN = [
-	'https://chienliu.com', // Production
-	'http://localhost:3000', // Local development
-	'http://localhost:8787', // Local development (Wrangler)
-];
-
-// Returns CORS headers with the appropriate origin
-function getCorsHeaders(requestOrigin) {
-	const origin = ALLOWED_ORIGIN.includes(requestOrigin) ? requestOrigin : ALLOWED_ORIGIN[0];
+// Returns CORS headers with the appropriate origin.
+// allowedOrigin comes from wrangler vars: wrangler.jsonc for prod, .env.local for local dev.
+function getCorsHeaders(requestOrigin, allowedOrigin) {
 	return {
-		'Access-Control-Allow-Origin': origin,
+		'Access-Control-Allow-Origin': allowedOrigin,
 		'Access-Control-Allow-Methods': 'POST, OPTIONS',
 		'Access-Control-Allow-Headers': 'Content-Type',
 		'Access-Control-Max-Age': '3600', // Cache preflight response for 1 hour
 	};
-}
-
-function validateRequestOrigin(requestOrigin) {
-	return requestOrigin && ALLOWED_ORIGIN.includes(requestOrigin);
-}
-
-function isAuthorizedRequest(c) {
-	const expected = c.env.WRITE_API_TOKEN;
-	if (!expected) return false;
-
-	const authHeader = c.req.header('Authorization') || '';
-	if (!authHeader.startsWith('Bearer ')) return false;
-
-	const provided = authHeader.slice('Bearer '.length);
-	const providedBuffer = Buffer.from(provided);
-	const expectedBuffer = Buffer.from(expected);
-
-	if (providedBuffer.length !== expectedBuffer.length) return false;
-	return timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
 function generateSystemPrompt(notes, topK) {
@@ -92,9 +81,9 @@ const app = new Hono();
 // Handle preflight CORS requests
 app.options('/chatbot', (c) => {
 	const requestOrigin = c.req.header('Origin');
-	const corsHeaders = getCorsHeaders(requestOrigin);
+	const corsHeaders = getCorsHeaders(requestOrigin, c.env.ALLOWED_ORIGIN);
 
-	if (!validateRequestOrigin(requestOrigin)) {
+	if (requestOrigin !== c.env.ALLOWED_ORIGIN) {
 		return c.json({ error: 'Forbidden' }, 403, corsHeaders);
 	}
 
@@ -103,9 +92,9 @@ app.options('/chatbot', (c) => {
 
 app.post('/chatbot', async (c) => {
 	const requestOrigin = c.req.header('Origin');
-	const corsHeaders = getCorsHeaders(requestOrigin);
+	const corsHeaders = getCorsHeaders(requestOrigin, c.env.ALLOWED_ORIGIN);
 
-	if (!validateRequestOrigin(requestOrigin)) {
+	if (requestOrigin !== c.env.ALLOWED_ORIGIN) {
 		return c.json({ error: 'Forbidden' }, 403, corsHeaders);
 	}
 
@@ -142,6 +131,11 @@ app.post('/chatbot', async (c) => {
 					{ role: 'system', content: systemPrompt },
 					{ role: 'user', content: user_input },
 				],
+				extra_body: {
+					chat_template_kwargs: {
+						enable_thinking: false,
+					},
+				},
 			},
 			{
 				gateway: {
@@ -186,13 +180,9 @@ app.post('/chatbot', async (c) => {
 });
 
 // Insert notes into RAG workflow which will handle vectorization and storage.
-// WRITE_API_TOKEN is intentionally absent in prod, so this endpoint is dev-only.
-// The dev env points to the prod D1 and Vectorize instances, enabling note
-// management without exposing the token.
+// Gated by ADMIN_API_ENABLED, which is only set in .env.local and never deployed.
 app.put('/notes/:id', async (c) => {
-	if (!isAuthorizedRequest(c)) {
-		return c.text('Unauthorized', 401);
-	}
+	if (!c.env.ADMIN_API_ENABLED) return c.notFound();
 
 	const noteId = c.req.param('id');
 	if (!noteId) {
@@ -214,14 +204,10 @@ app.put('/notes/:id', async (c) => {
 	return c.text('Upserted note', 202);
 });
 
-// Endpoint to delete notes by ID
-// WRITE_API_TOKEN is intentionally absent in prod, so this endpoint is dev-only.
-// The dev env points to the prod D1 and Vectorize instances, enabling note
-// management without exposing the token.
+// Endpoint to delete notes by ID.
+// Gated by ADMIN_API_ENABLED, which is only set in .env.local and never deployed.
 app.delete('/notes/:id', async (c) => {
-	if (!isAuthorizedRequest(c)) {
-		return c.text('Unauthorized', 401);
-	}
+	if (!c.env.ADMIN_API_ENABLED) return c.notFound();
 
 	const noteId = c.req.param('id');
 	if (!noteId) {

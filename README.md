@@ -1,6 +1,6 @@
 # RAG Notes Management
 
-This project keeps RAG source notes in the local `notes/` directory and syncs them into the Worker-backed D1 + Vectorize store.
+This project is an LLM-powered chatbot with a custom RAG system, deployed on Cloudflare's edge network. Check out the live demo at [chienliu.com](https://chienliu.com) — the chatbot can answer questions about the author, Chien Liu :smiley_cat:
 
 ## Architecture diagram
 
@@ -12,9 +12,8 @@ This project keeps RAG source notes in the local `notes/` directory and syncs th
 - The deployed Worker is built from the code in `src/`, with `src/worker.js` as the entrypoint.
 - The production route is `https://api.chienliu.com/chatbot`.
 - The local maintenance assets in `notes/` and `scripts/` support RAG content management, but they are not the Worker code that gets deployed from `src/`.
-- In practice: when you change the application logic that should run in production, update `src/`; when you manage local RAG content, work in `notes/` and use the sync script in `scripts/`.
 
-## How it works
+## How it manages RAG
 
 - Each markdown file in `notes/` is the source of truth for one RAG note.
 - The filename must follow this format:
@@ -34,19 +33,25 @@ Examples:
 - `${id}` must be a positive integer.
 - The sync script normalizes the filename ID before sending it to the API.
 - The resulting ID is reused as the note ID in D1 and Vectorize.
-- Remote note writes happen through `PUT /notes/:id` with a JSON body shaped like `{ "text": "..." }`.
+- Remote note writes happen through `PUT /notes/:id` (local only) with a JSON body shaped like `{ "text": "..." }`. In production, only `/chatbot` requests reach the Worker, so `/notes/:id` is unreachable at the edge.
 - Renaming or deleting local files affects remote data on the next sync.
 
-## Daily workflow
+## Workflow: Update RAG notes
 
 1. Create or edit markdown files in `notes/`.
-2. Start the local Worker:
+2. Copy `.env.local.example` to `.env.local` (first time only):
+
+```bash
+cp .env.local.example .env.local
+```
+
+3. Start the local Worker:
 
 ```bash
 npx wrangler dev
 ```
 
-3. In another terminal, run the sync:
+4. In another terminal, run the sync:
 
 ```bash
 npm run sync:notes
@@ -75,7 +80,7 @@ Because of this behavior:
 
 ## Troubleshooting
 
-- `Missing auth token`: export `WRITE_API_TOKEN`.
+- `Missing env variable`: ensure `.env.local` exists and contains `ADMIN_API_ENABLED=true`.
 - `Notes directory not found`: create `notes/` or set `RAG_SYNC_NOTES_DIR`.
 - `Invalid note filename`: rename the file to `${id}_name.md`.
 - `Duplicate note id`: ensure only one markdown file uses each numeric ID.

@@ -10,16 +10,16 @@ SCRIPT_PATH=$(realpath "${BASH_SOURCE[0]}")
 SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
 REPO_ROOT=$(dirname "$SCRIPT_DIR")
 
-# Load environment variables from .dev.vars
-. "$REPO_ROOT/.dev.vars"
+# Load environment variables from .env.local
+. "$REPO_ROOT/.env.local"
 
 NOTES_DIR="${REPO_ROOT}/notes"
 STATE_FILE="${REPO_ROOT}/.rag-sync-state"
-BASE_URL=${RAG_SYNC_BASE_URL:-http://127.0.0.1:8787}
+RAG_WORKER_URL=${RAG_WORKER_URL:-http://127.0.0.1:8787}
 
 
-if [[ -z "$WRITE_API_TOKEN" ]]; then
-	echo 'Missing auth token: set WRITE_API_TOKEN before running the sync script.' >&2
+if [[ -z "$ADMIN_API_ENABLED" ]]; then
+	echo 'Missing env variable: set ADMIN_API_ENABLED=true before running the sync script.' >&2
 	exit 1
 fi
 
@@ -95,10 +95,9 @@ upload_note() {
 	node --input-type=module -e "import { readFileSync } from 'node:fs'; process.stdout.write(JSON.stringify({ text: readFileSync(process.argv[1], 'utf8') }));" "$file_path" |
 		curl --silent --show-error --fail-with-body \
 			--request PUT \
-			--header "Authorization: Bearer $WRITE_API_TOKEN" \
 			--header 'Content-Type: application/json' \
 			--data-binary @- \
-			"$BASE_URL/notes/$note_id" >/dev/null
+			"$RAG_WORKER_URL/notes/$note_id" >/dev/null
 }
 
 # Sends a DELETE request to remove a note by ID from the RAG store.
@@ -107,8 +106,7 @@ delete_note() {
 
 	curl --silent --show-error --fail-with-body \
 		--request DELETE \
-		--header "Authorization: Bearer $WRITE_API_TOKEN" \
-		"$BASE_URL/notes/$note_id" >/dev/null
+		"$RAG_WORKER_URL/notes/$note_id" >/dev/null
 }
 
 # Atomically writes the current note hashes and paths to the state file.

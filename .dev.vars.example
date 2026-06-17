@@ -1,4 +1,0 @@
-WRITE_API_TOKEN=replace-with-a-local-write-token
-
-# Optional overrides for scripts/sync-rag-notes.sh
-# RAG_SYNC_BASE_URL=http://127.0.0.1:8787
