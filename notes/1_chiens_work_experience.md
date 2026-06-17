@@ -3,7 +3,7 @@
 ---
 
 ## Machine Learning Engineer - MLOps | Aignostics
-**Dates:** JULY 2024 - CURRENT  
+**Dates:** JULY 2024 - FEBRUARY 2026  (NOT CURRENT EMPLOYER)
 **Company URL:** https://aignostics.com/  
 **Summary:** Chien Liu works in a cross-functional team to build AI solutions for drug discovery. His main focus is on optimizing machine learning (ML) algorithms and maintaining scalable ML infrastructure on cloud platforms.
 **Key Achievements:**

@@ -42,10 +42,15 @@ When a user asks a question, the Worker executes a multi-step orchestration flow
 
 ---
 
-### Why use two databases?
+### 3. Why use two databases?
 
 The architecture separates **Search** from **Storage**:
 * **Vectorize** tells the system *where* the answer likely is by comparing mathematical similarity.
 * **D1** tells the system *what* the answer actually says by providing the original text.
 
 This separation allows the chatbot to scale efficiently while maintaining a high degree of accuracy and low latency by utilizing Cloudflare’s global edge network.
+
+---
+
+### Source Code
+The source code is published on https://github.com/chien-liu/cloudflare-worker-ai-chatbot
