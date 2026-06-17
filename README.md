@@ -1,6 +1,23 @@
-# RAG Notes Management
+# Personal AI Chatbot — RAG on Cloudflare Edge
 
 This project is an LLM-powered chatbot with a custom RAG system, deployed on Cloudflare's edge network. Check out the live demo at [chienliu.com](https://chienliu.com) — the chatbot can answer questions about the author, Chien Liu :smiley_cat:
+
+## Tech stack
+
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)
+![Workers AI](https://img.shields.io/badge/Cloudflare-Workers%20AI-F38020?logo=cloudflare&logoColor=white)
+![D1](https://img.shields.io/badge/Cloudflare-D1-F38020?logo=cloudflare&logoColor=white)
+![Vectorize](https://img.shields.io/badge/Cloudflare-Vectorize-F38020?logo=cloudflare&logoColor=white)
+![Workflows](https://img.shields.io/badge/Cloudflare-Workflows-F38020?logo=cloudflare&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black)
+![Hono](https://img.shields.io/badge/Hono-E36002?logo=hono&logoColor=white)
+
+- **Cloudflare Workers**: Edge runtime hosting the chatbot API
+- **Workers AI**: LLM inference for chat responses
+- **D1**: Relational store for RAG note metadata
+- **Vectorize**: Vector store for RAG embeddings/retrieval
+- **Workflows**: Orchestrates the RAG note sync process
+- **Hono**: Lightweight router for the Worker
 
 ## Architecture diagram
 
