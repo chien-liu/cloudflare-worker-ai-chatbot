@@ -2,11 +2,23 @@
  * API routes:
  * - `/chatbot` allows browser CORS requests from the configured origins below.
  *
- *   Example request:
+ *   Example request (first message, no history):
  *   curl -X POST https://<worker-host>/chatbot \
  *     -H "Content-Type: application/json" \
  *     -H "Origin: <allowed-origin>" \
- *     -d '{"user_input": "What does Chien do for work?"}'
+ *     -d '{"user_input": "Tell me about Chiens docker experience?"}'
+ *
+ *   Example request (follow-up with conversation history):
+ *   curl -X POST https://<worker-host>/chatbot \
+ *     -H "Content-Type: application/json" \
+ *     -H "Origin: <allowed-origin>" \
+ *     -d '{
+ *           "user_input": "Ellaborate it.",
+ *           "conversation_history": [
+ *             { "role": "user", "content": "Tell me about Chiens docker experience?" },
+ *             { "role": "assistant", "content": "Chien has experience optimizing Docker images and CI/CD build processes." }
+ *           ]
+ *         }'
  *   Response JSON format:
  *   {
  *     "response": "Generated answer text",
@@ -101,9 +113,10 @@ app.post('/chatbot', async (c) => {
 	const requestId = crypto.randomUUID();
 	const startTime = Date.now();
 	const topK = 3;
+	const conversationHistoryLimit = 3;
 
 	try {
-		const { user_input } = await c.req.json();
+		const { user_input, conversation_history } = await c.req.json();
 
 		// Embed the user question to find relevant notes
 		const embeddings = await c.env.AI.run(EMBEDDING_MODEL, { text: user_input });
@@ -129,6 +142,7 @@ app.post('/chatbot', async (c) => {
 			{
 				messages: [
 					{ role: 'system', content: systemPrompt },
+					...(Array.isArray(conversation_history) ? conversation_history.slice(-conversationHistoryLimit) : []),
 					{ role: 'user', content: user_input },
 				],
 			},

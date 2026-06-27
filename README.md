@@ -23,6 +23,24 @@ This project is an LLM-powered chatbot with a custom RAG system, deployed on Clo
 
 ![Architecture and workflow diagram](docs/architecture-workflow.svg)
 
+[TOC]
+
+## Conversation history
+
+The chatbot supports multi-turn conversations. It can answer follow-up questions like "Elaborate on that" or "What else?" because each request optionally carries an array of prior messages.
+
+### Design decision: frontend vs backend storage
+
+|  | Frontend storage (this project) | Backend storage |
+|--|--|--|
+| Where history lives | Browser memory — sent on each request | Server session or database |
+| Worker statefulness | Stateless — each request is self-contained | Stateful — Worker must read/write per-user state |
+| Implementation cost | None — client accumulates and sends history | Session IDs, a KV/D1 table, and an eviction strategy |
+| Privacy | History never persists beyond the tab session | History persists server-side |
+| Cloudflare cost | No extra bindings or reads/writes | D1 or KV reads and writes on every turn |
+
+**For a simple personal chatbot, frontend storage is the better call.** Leveraging frontend storage is simpler, cheaper, and more privacy-compliant.
+
 ## Cloudflare deployment
 
 - This repository is integrated with Cloudflare Workers.
