@@ -113,7 +113,7 @@ app.post('/chatbot', async (c) => {
 	const requestId = crypto.randomUUID();
 	const startTime = Date.now();
 	const topK = 3;
-	const conversationHistoryLimit = 3;
+	const conversationHistoryLimit = 10;
 
 	try {
 		const { user_input, conversation_history } = await c.req.json();
