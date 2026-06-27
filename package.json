@@ -9,7 +9,7 @@
 		"sync:notes": "bash scripts/sync-rag-notes.sh"
 	},
 	"devDependencies": {
-		"wrangler": "^4.51.0"
+		"wrangler": "^4.105.0"
 	},
 	"dependencies": {
 		"hono": "^4.12.12"
