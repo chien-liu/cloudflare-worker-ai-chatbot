@@ -16,6 +16,16 @@
 	"vars": {
 		"ALLOWED_ORIGIN": "https://chienliu.com"
 	},
+	"ratelimits": [
+		{
+			"name": "CHATBOT_RATE_LIMITER",
+			"namespace_id": "1001",
+			"simple": {
+				"limit": 5,
+				"period": 60
+			}
+		}
+	],
 	"observability": {
 		"enabled": true,
 		"head_sampling_rate": 1

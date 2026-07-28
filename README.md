@@ -48,6 +48,12 @@ The chatbot supports multi-turn conversations. It can answer follow-up questions
 - The production route is `https://api.chienliu.com/chatbot`.
 - The local maintenance assets in `notes/` and `scripts/` support RAG content management, but they are not the Worker code that gets deployed from `src/`.
 
+### Rate limiting
+
+- `POST /chatbot` is rate limited per client IP using the native Cloudflare Workers Rate Limiting binding (`CHATBOT_RATE_LIMITER`, configured in `wrangler.jsonc`).
+- Limit: 5 requests per 60 seconds per IP (identified via the `CF-Connecting-IP` header).
+- Requests over the limit receive `429 Too Many Requests`.
+
 ## How it manages RAG
 
 - Each markdown file in `notes/` is the source of truth for one RAG note.

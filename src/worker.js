@@ -115,6 +115,17 @@ app.post('/chatbot', async (c) => {
 	const topK = 3;
 	const conversationHistoryLimit = 10;
 
+	const clientIp = c.req.header('CF-Connecting-IP') ?? 'unknown';
+	const { success: withinRateLimit } = await c.env.CHATBOT_RATE_LIMITER.limit({ key: clientIp });
+	if (!withinRateLimit) {
+		console.warn({
+			requestId,
+			message: 'chatbot request rate limited',
+			client_ip: clientIp,
+		});
+		return c.json({ error: 'Hit rate limit. Please try again later.' }, 429, corsHeaders);
+	}
+
 	try {
 		const { user_input, conversation_history } = await c.req.json();
 
