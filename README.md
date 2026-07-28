@@ -23,8 +23,6 @@ This project is an LLM-powered chatbot with a custom RAG system, deployed on Clo
 
 ![Architecture and workflow diagram](docs/architecture-workflow.svg)
 
-[TOC]
-
 ## Conversation history
 
 The chatbot supports multi-turn conversations. It can answer follow-up questions like "Elaborate on that" or "What else?" because each request optionally carries an array of prior messages.
