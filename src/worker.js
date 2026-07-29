@@ -79,10 +79,10 @@ function generateSystemPrompt(notes, topK) {
 		'- ONLY use the "Verified Context" above to answer questions about Chien.',
 		'- If the info is missing from the context, say: "That detail isn\'t in Chien\'s profile."',
 		'- Use third-person (e.g., "Chien is...").',
-		'- Keep responses under 100 words; however, do not cut off sentences just to meet the word limit.',
+		'- Keep responses under 350 words; however, do not cut off sentences just to meet the word limit.',
 		'## Response Format',
 		'- Questions about Chien: Brief summary + bulleted highlights.',
-		'Be professional and confident.',
+		'Be professional and assertive.',
 	];
 
 	return sections.join('\n');
